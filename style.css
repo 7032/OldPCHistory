@@ -1,0 +1,345 @@
+/* 国産パソコン年表ビューア - スタイル
+   外部フォント・外部CSSは一切読み込まず、システムフォントのみを使用する。 */
+
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --panel-2: #1e222b;
+  --ink: #e8ecf2;
+  --muted: #98a2b3;
+  --line: #2a303c;
+  --accent: #ffd43b;
+  --quick: #ff6b6b;
+  --heisei: #ff922b;
+  --branch: #9aa7bd;
+  --focus: #74c0fc;
+  --radius: 10px;
+  --topbar-h: auto;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+               "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- ヘッダ / コントロール ---------- */
+
+.topbar {
+  flex: 0 0 auto;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: .02em;
+}
+
+.brand .sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+
+.ctl-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.ctl-group > label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.btn,
+.select,
+.search,
+.maker-toggle {
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.btn.ghost { background: transparent; color: var(--muted); }
+.btn:hover, .select:hover, .maker-toggle:hover { border-color: #3d465a; }
+
+.search {
+  cursor: text;
+  min-width: 200px;
+  max-width: 44vw;
+}
+
+.count {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 3.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* メーカートグル */
+.maker-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 13px;
+  opacity: .42;
+  filter: grayscale(1);
+}
+.maker-toggle[aria-pressed="true"] {
+  opacity: 1;
+  filter: none;
+}
+.maker-toggle .swatch {
+  width: 12px; height: 12px;
+  border-radius: 3px;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+/* 凡例 */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12px;
+  color: var(--muted);
+  align-items: center;
+}
+.legend .lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend .lg-line {
+  width: 26px; height: 0;
+  border-top: 2px solid var(--muted);
+}
+.legend .lg-line.heisei { border-top: 3px dashed var(--heisei); }
+.legend .lg-line.branch { border-top: 2px dashed var(--branch); }
+
+/* ---------- 本体 ---------- */
+
+main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.status {
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.status.error { color: #ff8787; }
+.status[hidden] { display: none; }
+
+.scroller {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: var(--bg);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+#chart { display: block; }
+
+.hint {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 5px 14px;
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+/* ---------- SVG 内の見た目 ---------- */
+
+.model-box { cursor: pointer; }
+.model-box .box-rect {
+  stroke-width: 1.5;
+  transition: filter .12s ease;
+}
+.model-box:hover .box-rect,
+.model-box:focus .box-rect { filter: brightness(1.35); }
+.model-box:focus { outline: none; }
+.model-box:focus .box-rect {
+  stroke: var(--focus);
+  stroke-width: 2.5;
+}
+
+.model-box.dim { opacity: .16; }
+.model-box.hit .box-rect {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.conn { fill: none; stroke-linecap: round; }
+.conn.dim { opacity: .12; }
+
+/* 系列をまたぐ分岐線（破線の矢印）。本線より細く控えめに描く。 */
+.branch {
+  fill: none;
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+  pointer-events: stroke;
+}
+.branch.dim { opacity: .12; }
+
+/* ---------- モーダル ---------- */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal[hidden] { display: none; }
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .62);
+}
+
+.modal-panel {
+  position: relative;
+  width: min(480px, 100%);
+  max-height: 84vh;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 20px 20px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55);
+}
+
+.modal-close {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 34px; height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-maker {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+.modal-title {
+  margin: 0 0 12px;
+  font-size: 19px;
+  line-height: 1.35;
+  padding-right: 34px;
+}
+
+.modal-dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 8.5em 1fr;
+  gap: 6px 12px;
+  font-size: 14px;
+}
+.modal-dl dt {
+  color: var(--muted);
+  font-size: 12.5px;
+  padding-top: 2px;
+}
+.modal-dl dd { margin: 0; }
+.modal-dl dd.none { color: var(--muted); }
+
+.gap-badge {
+  display: inline-block;
+  margin-left: 6px;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.gap-badge.quick {
+  border-color: var(--quick);
+  color: var(--quick);
+  font-weight: 700;
+}
+
+/* ---------- 狭幅対応 ---------- */
+
+@media (max-width: 720px) {
+  .brand h1 { font-size: 16px; }
+  .brand .sub { font-size: 11px; }
+  .topbar { padding: 8px 10px; }
+  .controls { gap: 6px 10px; }
+  .search { min-width: 140px; max-width: 60vw; }
+  .legend { font-size: 11px; gap: 4px 10px; }
+  .modal-dl { grid-template-columns: 1fr; gap: 2px; }
+  .modal-dl dt { padding-top: 8px; }
+}
+
+@media (max-width: 420px) {
+  .maker-toggle { padding: 4px 8px; font-size: 12px; }
+  .btn, .select { padding: 5px 8px; }
+}

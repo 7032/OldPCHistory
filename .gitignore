@@ -1,0 +1,9 @@
+# Claude Code
+.claude/
+
+# OS / エディタ / 言語処理系が作る不要ファイル
+.DS_Store
+Thumbs.db
+node_modules/
+__pycache__/
+*.pyc

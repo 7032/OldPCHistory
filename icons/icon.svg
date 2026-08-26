@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="国産パソコン年表アイコン">
+  <rect width="512" height="512" rx="0" fill="#0f1115"/>
+  <rect x="0" y="0" width="512" height="512" rx="102" fill="#171a21"/>
+  <g stroke="#2a303c" stroke-width="2">
+    <line x1="51" y1="97" x2="461" y2="97"/>
+    <line x1="51" y1="143" x2="461" y2="143"/>
+    <line x1="51" y1="188" x2="461" y2="188"/>
+    <line x1="51" y1="234" x2="461" y2="234"/>
+    <line x1="51" y1="279" x2="461" y2="279"/>
+    <line x1="51" y1="325" x2="461" y2="325"/>
+    <line x1="51" y1="370" x2="461" y2="370"/>
+    <line x1="51" y1="416" x2="461" y2="416"/>
+  </g>
+  <g>
+    <line x1="102" y1="74" x2="102" y2="348" stroke="#4b7bec" stroke-width="6"/>
+    <rect x="65" y="60" width="74" height="28" rx="14" fill="#4b7bec"/>
+    <rect x="65" y="197" width="74" height="28" rx="14" fill="#4b7bec"/>
+    <rect x="65" y="334" width="74" height="28" rx="14" fill="#4b7bec"/>
+  </g>
+  <g>
+    <line x1="205" y1="120" x2="205" y2="439" stroke="#2f9e44" stroke-width="6"/>
+    <rect x="168" y="106" width="74" height="28" rx="14" fill="#2f9e44"/>
+    <rect x="168" y="243" width="74" height="28" rx="14" fill="#2f9e44"/>
+    <rect x="168" y="425" width="74" height="28" rx="14" fill="#2f9e44"/>
+  </g>
+  <g>
+    <line x1="307" y1="74" x2="307" y2="348" stroke="#e64980" stroke-width="6"/>
+    <rect x="270" y="60" width="74" height="28" rx="14" fill="#e64980"/>
+    <rect x="270" y="151" width="74" height="28" rx="14" fill="#e64980"/>
+    <rect x="270" y="288" width="74" height="28" rx="14" fill="#e64980"/>
+    <rect x="270" y="334" width="74" height="28" rx="14" fill="#e64980"/>
+    <line x1="307" y1="302" x2="307" y2="348" stroke="#ff6b6b" stroke-width="13"/>
+  </g>
+  <g>
+    <line x1="410" y1="165" x2="410" y2="394" stroke="#8e44ad" stroke-width="6"/>
+    <rect x="373" y="151" width="74" height="28" rx="14" fill="#8e44ad"/>
+    <rect x="373" y="288" width="74" height="28" rx="14" fill="#8e44ad"/>
+    <rect x="373" y="380" width="74" height="28" rx="14" fill="#8e44ad"/>
+  </g>
+  <line x1="51" y1="370" x2="461" y2="370" stroke="#ff922b" stroke-width="5" stroke-dasharray="22 22"/>
+</svg>
