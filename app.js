@@ -71,6 +71,53 @@ function gapText(n) {
  * ========================================================================= */
 
 /**
+ * 系列の分類軸の定義表。パーサーと絞り込みUIの双方でこの1か所を共用する。
+ * axis: 軸のキー / groupId: 絞り込みボタンを入れる要素の id /
+ * values: その軸に属する分類（key は timeline.md の宣言行の接頭辞、label はボタンの表示名）。
+ */
+var TAG_AXES = [
+  { axis: 'bits', groupId: 'bitToggles', values: [
+    { key: '8bit', label: '8bit' },
+    { key: '16bit', label: '16/32bit' }
+  ] },
+  { axis: 'form', groupId: 'formToggles', values: [
+    { key: 'desktop', label: 'デスクトップ' },
+    { key: 'laptop', label: 'ラップトップ' }
+  ] },
+  { axis: 'env', groupId: 'envToggles', values: [
+    { key: 'basic', label: 'BASIC機' },
+    { key: 'dos', label: 'DOS機' },
+    { key: 'windows', label: 'Windows機' }
+  ] },
+  { axis: 'use', groupId: 'useToggles', values: [
+    { key: 'hobby', label: 'ホビー機' },
+    { key: 'business', label: 'ビジネス機' }
+  ] }
+];
+
+/** 分類キー → 軸キー の逆引き表（TAG_AXES から組み立てる） */
+var TAG_KEY_AXIS = (function () {
+  var map = Object.create(null);
+  for (var a = 0; a < TAG_AXES.length; a++) {
+    for (var v = 0; v < TAG_AXES[a].values.length; v++) {
+      map[TAG_AXES[a].values[v].key] = TAG_AXES[a].axis;
+    }
+  }
+  return map;
+})();
+
+/** 分類宣言行にマッチする正規表現（TAG_AXES の全キーから組み立てる） */
+var TAG_LINE_RE = (function () {
+  var keys = [];
+  for (var a = 0; a < TAG_AXES.length; a++) {
+    for (var v = 0; v < TAG_AXES[a].values.length; v++) {
+      keys.push(TAG_AXES[a].values[v].key);
+    }
+  }
+  return new RegExp('^(' + keys.join('|') + ')\\s*:\\s*(.*)$');
+})();
+
+/**
  * timeline.md を解析する。
  *
  * 書式:
@@ -78,8 +125,10 @@ function gapText(n) {
  *   color: #RRGGBB           直前のメーカーの色
  *   lanes: 系列名, 系列名     レーンの並び順（任意）
  *   branch: 子系列名 < 親機種名  系列の派生元（任意・複数可）
- *   8bit: 系列名, 系列名      系列のビット数分類（任意・複数可）
- *   16bit: 系列名, 系列名     同上。両方に書いた系列は両対応機として扱う
+ *   8bit: 系列名, 系列名      系列の分類（任意・複数可）。キーは TAG_AXES に定義した
+ *                            8bit / 16bit / desktop / laptop / basic / dos / windows /
+ *                            hobby / business。同じ軸の複数キーに書いた系列は
+ *                            その軸で両対応として扱う
  *   YYYY-MM | 機種名 | 系列  1機種
  *
  * 空行・見出し・コメント・不正行は読み飛ばし、警告として記録する。
@@ -126,7 +175,7 @@ function parseTimeline(text) {
         current = dup;
       } else {
         current = { name: name, color: null, order: makers.length, series: [], laneDecl: null,
-                    bitDecls: [], seriesBits: null };
+                    tagDecls: [], seriesTags: null };
         makers.push(current);
       }
       continue;
@@ -186,21 +235,21 @@ function parseTimeline(text) {
       continue;
     }
 
-    // ビット数分類宣言: 8bit: <系列名>, <系列名> / 16bit: <系列名>, <系列名>
+    // 分類宣言: 8bit: <系列名>, <系列名> など（キーは TAG_AXES に定義したもの全般）
     // lanes: と同様に、区切りはカンマのみとする。
-    var xh = /^(8|16)bit\s*:\s*(.*)$/.exec(line);
+    var xh = TAG_LINE_RE.exec(line);
     if (xh) {
       if (!current) {
-        warnings.push(lineNo + '行目: メーカー見出しの前に ' + xh[1] + 'bit 指定があります。無視しました。');
+        warnings.push(lineNo + '行目: メーカー見出しの前に ' + xh[1] + ' 指定があります。無視しました。');
         continue;
       }
-      var bitNames = [];
-      var rawBitNames = xh[2].split(',');
-      for (var bn = 0; bn < rawBitNames.length; bn++) {
-        var nm3 = rawBitNames[bn].trim();
-        if (nm3 !== '') bitNames.push(nm3);
+      var tagNames = [];
+      var rawTagNames = xh[2].split(',');
+      for (var bn = 0; bn < rawTagNames.length; bn++) {
+        var nm3 = rawTagNames[bn].trim();
+        if (nm3 !== '') tagNames.push(nm3);
       }
-      current.bitDecls.push({ bits: xh[1], names: bitNames, line: lineNo });
+      current.tagDecls.push({ key: xh[1], axis: TAG_KEY_AXIS[xh[1]], names: tagNames, line: lineNo });
       continue;
     }
 
@@ -273,7 +322,7 @@ function parseTimeline(text) {
       warnings.push('メーカー "' + makers[k].name + '" に color 指定がないため既定色を使いました。');
     }
     applyLaneOrder(makers[k], warnings);
-    applyBitDecls(makers[k], warnings);
+    applyTagDecls(makers[k], warnings);
   }
 
   var branches = resolveBranches(branchDecls, models, warnings);
@@ -329,33 +378,36 @@ function applyLaneOrder(maker, warnings) {
 }
 
 /**
- * 8bit: / 16bit: 宣言からメーカーの系列ビット数分類を確定する。
+ * 8bit: / desktop: などの分類宣言からメーカーの系列分類を確定する。
  * 全機種を読み終えた後に呼ぶこと。実在しない系列名は警告して無視する。
- * 同じ系列を 8bit: と 16bit: の両方に書けば両対応機として扱う。
- * どの宣言にも現れない系列は「分類なし」となり、絞り込みの影響を受けない。
+ * 同じ系列を同一軸の複数キー（例: 8bit: と 16bit:）に書けばその軸で両対応として扱う。
+ * ある軸のどの宣言にも現れない系列はその軸では「分類なし」となり、絞り込みの影響を受けない。
  *
- * @param {Object} maker メーカー（bitDecls が宣言順で入っている）
+ * 組み立てる seriesTags の形: 系列名 → 軸キー → 分類キー → true
+ *
+ * @param {Object} maker メーカー（tagDecls が宣言順で入っている）
  * @param {Array<string>} warnings 警告の追加先
  */
-function applyBitDecls(maker, warnings) {
-  var bits = Object.create(null);
-  var decls = maker.bitDecls || [];
+function applyTagDecls(maker, warnings) {
+  var tags = Object.create(null);
+  var decls = maker.tagDecls || [];
 
   for (var i = 0; i < decls.length; i++) {
     var decl = decls[i];
     for (var j = 0; j < decl.names.length; j++) {
       var nm = decl.names[j];
       if (maker.series.indexOf(nm) === -1) {
-        warnings.push(decl.line + '行目: メーカー "' + maker.name + '" の ' + decl.bits +
-                      'bit に実在しない系列 "' + nm + '" があります。無視しました。');
+        warnings.push(decl.line + '行目: メーカー "' + maker.name + '" の ' + decl.key +
+                      ' に実在しない系列 "' + nm + '" があります。無視しました。');
         continue;
       }
-      if (!bits[nm]) bits[nm] = {};
-      bits[nm][decl.bits] = true;
+      if (!tags[nm]) tags[nm] = {};
+      if (!tags[nm][decl.axis]) tags[nm][decl.axis] = {};
+      tags[nm][decl.axis][decl.key] = true;
     }
   }
 
-  maker.seriesBits = bits;
+  maker.seriesTags = tags;
 }
 
 /**
@@ -654,7 +706,7 @@ if (typeof document !== 'undefined') {
       branches: [],
       warnings: [],
       hiddenMakers: Object.create(null),
-      hiddenBits: Object.create(null),
+      hiddenTags: Object.create(null),
       query: '',
       hits: [],
       zoom: 1,
@@ -675,7 +727,6 @@ if (typeof document !== 'undefined') {
     var elChart      = document.getElementById('chart');
     var elStatus     = document.getElementById('status');
     var elToggles    = document.getElementById('makerToggles');
-    var elBitToggles = document.getElementById('bitToggles');
     var elLegend     = document.getElementById('legend');
     var elSearch     = document.getElementById('searchInput');
     var elSearchCnt  = document.getElementById('searchCount');
@@ -705,19 +756,30 @@ if (typeof document !== 'undefined') {
     }
 
     /**
-     * 系列がビット数の絞り込みで可視かどうかを判定する。
-     * 分類なしの系列は常に可視。分類ありの系列は、属する分類のうち
-     * 1つでも表示中なら可視とする（両対応機は片方を隠しても残る）。
+     * 系列が分類の絞り込みで可視かどうかを判定する。
+     * 軸ごとに: その軸で分類なしの系列は通過、分類ありの系列は属する分類のうち
+     * 1つでも表示中なら通過（軸内は OR。両対応の系列は片方を隠しても残る）。
+     * 全軸を通過した系列のみ可視とする（軸間は AND）。
      * @param {Object} maker メーカー
      * @param {string} seriesName 系列名
      * @returns {boolean}
      */
     function isSeriesVisible(maker, seriesName) {
-      var bits = maker.seriesBits ? maker.seriesBits[seriesName] : null;
-      if (!bits) return true;                   // 分類なしは絞り込みの影響を受けない
-      if (bits['8'] && !state.hiddenBits['8']) return true;
-      if (bits['16'] && !state.hiddenBits['16']) return true;
-      return false;
+      var tags = maker.seriesTags ? maker.seriesTags[seriesName] : null;
+      if (!tags) return true;                   // 全軸で分類なしは絞り込みの影響を受けない
+      for (var a = 0; a < TAG_AXES.length; a++) {
+        var axis = TAG_AXES[a];
+        var vals = tags[axis.axis];
+        if (!vals) continue;                    // この軸では分類なし → 通過
+        var hidden = state.hiddenTags[axis.axis];
+        var pass = false;
+        for (var v = 0; v < axis.values.length; v++) {
+          var key = axis.values[v].key;
+          if (vals[key] && !(hidden && hidden[key])) { pass = true; break; }
+        }
+        if (!pass) return false;
+      }
+      return true;
     }
 
     /** 表示中メーカーから列とレーンのレイアウトを組み立てる */
@@ -729,7 +791,7 @@ if (typeof document !== 'undefined') {
         if (state.hiddenMakers[mk.name]) continue;
 
         // lanes: 宣言があればその順、無ければ機種行の出現順。
-        // ビット数の絞り込みで畳まれた系列はレーンごと省く。
+        // 分類の絞り込みで畳まれた系列はレーンごと省く。
         var lanes = [];
         for (var s = 0; s < mk.series.length; s++) {
           if (isSeriesVisible(mk, mk.series[s])) lanes.push(mk.series[s]);
@@ -1361,30 +1423,34 @@ if (typeof document !== 'undefined') {
       });
     }
 
-    /** ビット数絞り込みボタンの定義（キーは hiddenBits と共通） */
-    var BIT_TOGGLES = [
-      { bits: '8', label: '8bit' },
-      { bits: '16', label: '16/32bit' }
-    ];
-
-    function buildBitToggles() {
-      while (elBitToggles.firstChild) elBitToggles.removeChild(elBitToggles.firstChild);
-      BIT_TOGGLES.forEach(function (def) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'maker-toggle bit-toggle';
-        b.setAttribute('aria-pressed', state.hiddenBits[def.bits] ? 'false' : 'true');
-        b.appendChild(htmlEl('span', 'swatch'));
-        var lab = htmlEl('span', null, def.label);
-        lab.style.color = 'var(--ink)';
-        b.appendChild(lab);
-        b.addEventListener('click', function () {
-          if (state.hiddenBits[def.bits]) delete state.hiddenBits[def.bits];
-          else state.hiddenBits[def.bits] = true;
-          b.setAttribute('aria-pressed', state.hiddenBits[def.bits] ? 'false' : 'true');
-          render();
+    /**
+     * 分類絞り込みボタンを軸ごとの ctl-group へ組み立てる。
+     * 定義は TAG_AXES（パーサーと共用）。キーは hiddenTags と共通。
+     */
+    function buildTagToggles() {
+      TAG_AXES.forEach(function (axis) {
+        var groupEl = document.getElementById(axis.groupId);
+        if (!groupEl) return;
+        if (!state.hiddenTags[axis.axis]) state.hiddenTags[axis.axis] = Object.create(null);
+        var hidden = state.hiddenTags[axis.axis];
+        while (groupEl.firstChild) groupEl.removeChild(groupEl.firstChild);
+        axis.values.forEach(function (def) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'maker-toggle bit-toggle';
+          b.setAttribute('aria-pressed', hidden[def.key] ? 'false' : 'true');
+          b.appendChild(htmlEl('span', 'swatch'));
+          var lab = htmlEl('span', null, def.label);
+          lab.style.color = 'var(--ink)';
+          b.appendChild(lab);
+          b.addEventListener('click', function () {
+            if (hidden[def.key]) delete hidden[def.key];
+            else hidden[def.key] = true;
+            b.setAttribute('aria-pressed', hidden[def.key] ? 'false' : 'true');
+            render();
+          });
+          groupEl.appendChild(b);
         });
-        elBitToggles.appendChild(b);
       });
     }
 
@@ -1540,7 +1606,7 @@ if (typeof document !== 'undefined') {
         state.series = buildSeries(parsed.models);
 
         buildMakerToggles();
-        buildBitToggles();
+        buildTagToggles();
         buildLegend();
         render();
 
