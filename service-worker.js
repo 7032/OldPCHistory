@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var CACHE_VERSION = 'v9';
+var CACHE_VERSION = 'v10';
 var CACHE_NAME = 'oldpc-timeline-' + CACHE_VERSION;
 
 /** プリキャッシュ対象（すべて相対パス） */

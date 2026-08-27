@@ -146,6 +146,9 @@ body {
   flex: 0 0 auto;
 }
 
+/* ビット数絞り込みトグル（メーカートグルの見た目を中立色で流用） */
+.bit-toggle { color: var(--branch); }
+
 /* 凡例 */
 .legend {
   display: flex;

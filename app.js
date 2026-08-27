@@ -78,6 +78,8 @@ function gapText(n) {
  *   color: #RRGGBB           直前のメーカーの色
  *   lanes: 系列名, 系列名     レーンの並び順（任意）
  *   branch: 子系列名 < 親機種名  系列の派生元（任意・複数可）
+ *   8bit: 系列名, 系列名      系列のビット数分類（任意・複数可）
+ *   16bit: 系列名, 系列名     同上。両方に書いた系列は両対応機として扱う
  *   YYYY-MM | 機種名 | 系列  1機種
  *
  * 空行・見出し・コメント・不正行は読み飛ばし、警告として記録する。
@@ -123,7 +125,8 @@ function parseTimeline(text) {
         warnings.push(lineNo + '行目: メーカー "' + name + '" が重複しています。既存セクションに統合しました。');
         current = dup;
       } else {
-        current = { name: name, color: null, order: makers.length, series: [], laneDecl: null };
+        current = { name: name, color: null, order: makers.length, series: [], laneDecl: null,
+                    bitDecls: [], seriesBits: null };
         makers.push(current);
       }
       continue;
@@ -180,6 +183,24 @@ function parseTimeline(text) {
         parentName: bh[2],
         line: lineNo
       });
+      continue;
+    }
+
+    // ビット数分類宣言: 8bit: <系列名>, <系列名> / 16bit: <系列名>, <系列名>
+    // lanes: と同様に、区切りはカンマのみとする。
+    var xh = /^(8|16)bit\s*:\s*(.*)$/.exec(line);
+    if (xh) {
+      if (!current) {
+        warnings.push(lineNo + '行目: メーカー見出しの前に ' + xh[1] + 'bit 指定があります。無視しました。');
+        continue;
+      }
+      var bitNames = [];
+      var rawBitNames = xh[2].split(',');
+      for (var bn = 0; bn < rawBitNames.length; bn++) {
+        var nm3 = rawBitNames[bn].trim();
+        if (nm3 !== '') bitNames.push(nm3);
+      }
+      current.bitDecls.push({ bits: xh[1], names: bitNames, line: lineNo });
       continue;
     }
 
@@ -252,6 +273,7 @@ function parseTimeline(text) {
       warnings.push('メーカー "' + makers[k].name + '" に color 指定がないため既定色を使いました。');
     }
     applyLaneOrder(makers[k], warnings);
+    applyBitDecls(makers[k], warnings);
   }
 
   var branches = resolveBranches(branchDecls, models, warnings);
@@ -304,6 +326,36 @@ function applyLaneOrder(maker, warnings) {
   }
 
   maker.series = ordered;
+}
+
+/**
+ * 8bit: / 16bit: 宣言からメーカーの系列ビット数分類を確定する。
+ * 全機種を読み終えた後に呼ぶこと。実在しない系列名は警告して無視する。
+ * 同じ系列を 8bit: と 16bit: の両方に書けば両対応機として扱う。
+ * どの宣言にも現れない系列は「分類なし」となり、絞り込みの影響を受けない。
+ *
+ * @param {Object} maker メーカー（bitDecls が宣言順で入っている）
+ * @param {Array<string>} warnings 警告の追加先
+ */
+function applyBitDecls(maker, warnings) {
+  var bits = Object.create(null);
+  var decls = maker.bitDecls || [];
+
+  for (var i = 0; i < decls.length; i++) {
+    var decl = decls[i];
+    for (var j = 0; j < decl.names.length; j++) {
+      var nm = decl.names[j];
+      if (maker.series.indexOf(nm) === -1) {
+        warnings.push(decl.line + '行目: メーカー "' + maker.name + '" の ' + decl.bits +
+                      'bit に実在しない系列 "' + nm + '" があります。無視しました。');
+        continue;
+      }
+      if (!bits[nm]) bits[nm] = {};
+      bits[nm][decl.bits] = true;
+    }
+  }
+
+  maker.seriesBits = bits;
 }
 
 /**
@@ -602,6 +654,7 @@ if (typeof document !== 'undefined') {
       branches: [],
       warnings: [],
       hiddenMakers: Object.create(null),
+      hiddenBits: Object.create(null),
       query: '',
       hits: [],
       zoom: 1,
@@ -622,6 +675,7 @@ if (typeof document !== 'undefined') {
     var elChart      = document.getElementById('chart');
     var elStatus     = document.getElementById('status');
     var elToggles    = document.getElementById('makerToggles');
+    var elBitToggles = document.getElementById('bitToggles');
     var elLegend     = document.getElementById('legend');
     var elSearch     = document.getElementById('searchInput');
     var elSearchCnt  = document.getElementById('searchCount');
@@ -650,6 +704,22 @@ if (typeof document !== 'undefined') {
       return rowTop(mi) + GEO.monthH / 2;
     }
 
+    /**
+     * 系列がビット数の絞り込みで可視かどうかを判定する。
+     * 分類なしの系列は常に可視。分類ありの系列は、属する分類のうち
+     * 1つでも表示中なら可視とする（両対応機は片方を隠しても残る）。
+     * @param {Object} maker メーカー
+     * @param {string} seriesName 系列名
+     * @returns {boolean}
+     */
+    function isSeriesVisible(maker, seriesName) {
+      var bits = maker.seriesBits ? maker.seriesBits[seriesName] : null;
+      if (!bits) return true;                   // 分類なしは絞り込みの影響を受けない
+      if (bits['8'] && !state.hiddenBits['8']) return true;
+      if (bits['16'] && !state.hiddenBits['16']) return true;
+      return false;
+    }
+
     /** 表示中メーカーから列とレーンのレイアウトを組み立てる */
     function computeLayout() {
       var cols = [];
@@ -658,7 +728,14 @@ if (typeof document !== 'undefined') {
         var mk = state.makers[i];
         if (state.hiddenMakers[mk.name]) continue;
 
-        var lanes = mk.series.slice();          // lanes: 宣言があればその順、無ければ機種行の出現順
+        // lanes: 宣言があればその順、無ければ機種行の出現順。
+        // ビット数の絞り込みで畳まれた系列はレーンごと省く。
+        var lanes = [];
+        for (var s = 0; s < mk.series.length; s++) {
+          if (isSeriesVisible(mk, mk.series[s])) lanes.push(mk.series[s]);
+        }
+        if (mk.series.length && !lanes.length) continue;   // 可視レーンが無ければ列ごと省く
+
         var laneIndex = Object.create(null);
         for (var l = 0; l < lanes.length; l++) laneIndex[lanes[l]] = l;
 
@@ -809,6 +886,7 @@ if (typeof document !== 'undefined') {
 
         var col = colOf(layout, ser.maker);
         if (!col) continue;
+        if (col.laneIndex[ser.name] === undefined) continue;   // 畳まれた系列は描かない
 
         var x = laneCenterX(col, ser.name);
         var items = ser.items;
@@ -880,6 +958,10 @@ if (typeof document !== 'undefined') {
         if (from.mi < MI_MIN || from.mi > MI_MAX) continue;
         if (to.mi < MI_MIN || to.mi > MI_MAX) continue;
 
+        // 親側・子側どちらの系列が畳まれていても分岐線は描かない
+        if (col.laneIndex[from.series] === undefined) continue;
+        if (col.laneIndex[to.series] === undefined) continue;
+
         var x1 = laneCenterX(col, from.series);
         var x2 = laneCenterX(col, to.series);
         var y2 = rowCenter(to.mi) - GEO.boxH / 2;
@@ -932,6 +1014,7 @@ if (typeof document !== 'undefined') {
 
         var col = colOf(layout, m.maker);
         if (!col) continue;
+        if (col.laneIndex[m.series] === undefined) continue;   // 畳まれた系列は描かない
 
         var cx = laneCenterX(col, m.series);
         var boxW = GEO.laneW - 6;
@@ -1278,6 +1361,33 @@ if (typeof document !== 'undefined') {
       });
     }
 
+    /** ビット数絞り込みボタンの定義（キーは hiddenBits と共通） */
+    var BIT_TOGGLES = [
+      { bits: '8', label: '8bit' },
+      { bits: '16', label: '16/32bit' }
+    ];
+
+    function buildBitToggles() {
+      while (elBitToggles.firstChild) elBitToggles.removeChild(elBitToggles.firstChild);
+      BIT_TOGGLES.forEach(function (def) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'maker-toggle bit-toggle';
+        b.setAttribute('aria-pressed', state.hiddenBits[def.bits] ? 'false' : 'true');
+        b.appendChild(htmlEl('span', 'swatch'));
+        var lab = htmlEl('span', null, def.label);
+        lab.style.color = 'var(--ink)';
+        b.appendChild(lab);
+        b.addEventListener('click', function () {
+          if (state.hiddenBits[def.bits]) delete state.hiddenBits[def.bits];
+          else state.hiddenBits[def.bits] = true;
+          b.setAttribute('aria-pressed', state.hiddenBits[def.bits] ? 'false' : 'true');
+          render();
+        });
+        elBitToggles.appendChild(b);
+      });
+    }
+
     function buildLegend() {
       while (elLegend.firstChild) elLegend.removeChild(elLegend.firstChild);
 
@@ -1430,6 +1540,7 @@ if (typeof document !== 'undefined') {
         state.series = buildSeries(parsed.models);
 
         buildMakerToggles();
+        buildBitToggles();
         buildLegend();
         render();
 
