@@ -12,7 +12,7 @@
 var SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** 年表の表示範囲（両端を含む） */
-var RANGE = { startYear: 1978, startMonth: 9, endYear: 1989, endMonth: 11 };
+var RANGE = { startYear: 1978, startMonth: 9, endYear: 1995, endMonth: 7 };
 
 /** 3か月以内のモデルチェンジを「短期」とみなすしきい値 */
 var QUICK_MONTHS = 3;
@@ -50,8 +50,8 @@ function monthDiff(y1, m1, y2, m2) {
 }
 
 var MI_MIN = monthIndex(RANGE.startYear, RANGE.startMonth);   // 1978-09
-var MI_MAX = monthIndex(RANGE.endYear, RANGE.endMonth);       // 1989-11
-var MONTH_COUNT = MI_MAX - MI_MIN + 1;                        // 135
+var MI_MAX = monthIndex(RANGE.endYear, RANGE.endMonth);       // 1995-07
+var MONTH_COUNT = MI_MAX - MI_MIN + 1;                        // 203
 
 /** 月インデックスを "YYYY-MM" に戻す */
 function miToLabel(mi) {
