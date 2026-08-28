@@ -10,7 +10,7 @@
  */
 'use strict';
 
-var CACHE_VERSION = 'v16';
+var CACHE_VERSION = 'v17';
 var CACHE_NAME = 'oldpc-timeline-' + CACHE_VERSION;
 
 /** プリキャッシュ対象（すべて相対パス） */
@@ -20,6 +20,7 @@ var PRECACHE_PATHS = [
   './app.js',
   './style.css',
   './timeline.md',
+  './LICENSE',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',

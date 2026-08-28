@@ -71,6 +71,28 @@ body {
   color: var(--muted);
 }
 
+.brand-links {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+.brand-links a,
+.foot a {
+  color: var(--focus);
+  text-decoration: none;
+}
+.brand-links a:hover,
+.foot a:hover,
+.brand-links a:focus-visible,
+.foot a:focus-visible {
+  text-decoration: underline;
+}
+.brand-links .sep,
+.foot .sep {
+  margin: 0 6px;
+  color: var(--line);
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;
@@ -209,6 +231,15 @@ main {
   background: var(--panel);
 }
 
+.foot {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 4px 14px 6px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--panel);
+}
+
 /* ---------- SVG 内の見た目 ---------- */
 
 .model-box { cursor: pointer; }
@@ -334,6 +365,7 @@ main {
 @media (max-width: 720px) {
   .brand h1 { font-size: 16px; }
   .brand .sub { font-size: 11px; }
+  .brand-links { font-size: 10px; }
   .topbar { padding: 8px 10px; }
   .controls { gap: 6px 10px; }
   .search { min-width: 140px; max-width: 60vw; }
